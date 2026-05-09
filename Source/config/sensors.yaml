@@ -1,0 +1,64 @@
+# Sample sensor configuration
+# Loaded by the sensor simulator (client/) at startup.
+# TODO: complete the schema and add at least three sensors.
+
+
+    
+    
+# IoT Telemetry Pipeline — Sensor Configuration
+# Each sensor entry configures one simulated sensor process.
+# The client simulator reads this file at startup.
+server:
+  host: "127.0.0.1"
+  tcp_port: 9000
+  http_port: 8080
+  ws_port: 8081
+
+sensors:
+  - id: gh1-temp-01
+    type: temperature
+    location: "Greenhouse 1"
+    unit: "°C"
+    interval_seconds: 3
+    min_value: 18.0
+    max_value: 35.0
+
+  - id: gh1-humid-01
+    type: humidity
+    location: "Greenhouse 1"
+    unit: "%"
+    interval_seconds: 5
+    min_value: 55.0
+    max_value: 90.0
+
+  - id: gh1-soil-01
+    type: soil_moisture
+    location: "Greenhouse 1"
+    unit: "%"
+    interval_seconds: 10
+    min_value: 20.0
+    max_value: 80.0
+
+  - id: gh2-temp-01
+    type: temperature
+    location: "Greenhouse 2"
+    unit: "°C"
+    interval_seconds: 3
+    min_value: 19.0
+    max_value: 33.0
+
+  - id: gh2-light-01
+    type: light
+    location: "Greenhouse 2"
+    unit: "lux"
+    interval_seconds: 4
+    min_value: 0.0
+    max_value: 120000.0
+
+  - id: gh3-temp-01
+    type: temperature
+    location: "Greenhouse 3"
+    unit: "°C"
+    interval_seconds: 3
+    min_value: 17.0
+    max_value: 32.0
