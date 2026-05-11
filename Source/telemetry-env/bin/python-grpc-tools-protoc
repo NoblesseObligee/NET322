@@ -1,4 +1,4 @@
-#!/home/noblesse/NET322/Source/telemetry-env/bin/python
+#!/home/noblesse/NET322-1/Source/telemetry-env/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys

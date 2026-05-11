@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Greenhouse Telemetry Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:        #0d1117;
+    --surface:   #161b22;
+    --border:    #30363d;
+    --text:      #e6edf3;
+    --muted:     #8b949e;
+    --green:     #3fb950;
+    --blue:      #58a6ff;
+    --yellow:    #d29922;
+    --orange:    #f78166;
+    --purple:    #bc8cff;
+    --accent:    #238636;
+    --font:      'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--green);
+  }
+
+  #status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--muted);
+    display: inline-block;
+    margin-right: 8px;
+    transition: background 0.4s;
+  }
+  #status-dot.connected    { background: var(--green);  box-shadow: 0 0 8px var(--green); }
+  #status-dot.disconnected { background: var(--orange); }
+
+  #status-label { color: var(--muted); font-size: 12px; }
+
+  .controls {
+    padding: 12px 24px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .controls label { color: var(--muted); margin-right: 4px; }
+
+  select, input[type=text] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-family: var(--font);
+    font-size: 12px;
+    outline: none;
+  }
+
+  button {
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    padding: 5px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--font);
+    font-size: 12px;
+    transition: opacity 0.2s;
+  }
+  button:hover { opacity: 0.8; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+    padding: 20px 24px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .sensor-id   { font-size: 13px; font-weight: 600; color: var(--blue); }
+  .sensor-loc  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .sensor-val  { font-size: 28px; font-weight: 700; line-height: 1; }
+  .sensor-unit { font-size: 13px; color: var(--muted); margin-left: 4px; }
+
+  .type-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .badge-temperature { background: #ff7b5233; color: #ff7b52; }
+  .badge-humidity    { background: #58a6ff33; color: #58a6ff; }
+  .badge-soil_moisture { background: #3fb95033; color: #3fb950; }
+  .badge-light       { background: #d2992233; color: #d29922; }
+  .badge-unknown     { background: #8b949e33; color: #8b949e; }
+
+  canvas { width: 100% !important; }
+
+  .ts { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+  #log {
+    font-size: 11px;
+    color: var(--muted);
+    padding: 10px 24px;
+    max-height: 120px;
+    overflow-y: auto;
+    border-top: 1px solid var(--border);
+  }
+  #log .entry { margin-bottom: 2px; }
+  #log .entry span { color: var(--blue); }
+
+  #no-data {
+    text-align: center;
+    padding: 60px;
+    color: var(--muted);
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌿 Greenhouse Telemetry</h1>
+  <div>
+    <span id="status-dot" class="disconnected"></span>
+    <span id="status-label">Disconnected</span>
+  </div>
+</header>
+
+<div class="controls">
+  <label>WS Host:</label>
+  <input type="text" id="ws-host" value="127.0.0.1" style="width:120px"/>
+  <label>Port:</label>
+  <input type="text" id="ws-port" value="8081" style="width:60px"/>
+  <label>Filter sensor IDs (comma-sep, blank=all):</label>
+  <input type="text" id="ws-filter" value="" style="width:200px" placeholder="e.g. gh1-temp-01,gh2-light-01"/>
+  <button onclick="connect()">Connect</button>
+  <button onclick="disconnect()" style="background:#b62324">Disconnect</button>
+</div>
+
+<div class="grid" id="grid"></div>
+<div id="no-data">No data received yet. Connect to start.</div>
+
+<div id="log"></div>
+
+<script>
+const MAX_POINTS = 40;
+const COLORS = {
+  temperature:   '#ff7b52',
+  humidity:      '#58a6ff',
+  soil_moisture: '#3fb950',
+  light:         '#d29922',
+};
+
+let ws = null;
+const sensors  = {};  // sensor_id → { cfg, chart, labels, data }
+
+// ── WebSocket ──────────────────────────────────────────────────────────────
+
+function connect() {
+  if (ws) ws.close();
+
+  const host   = document.getElementById('ws-host').value.trim();
+  const port   = document.getElementById('ws-port').value.trim();
+  const filter = document.getElementById('ws-filter').value.trim();
+  const url    = `ws://${host}:${port}/live`;
+
+  log(`Connecting to ${url} …`);
+  ws = new WebSocket(url);
+
+  ws.onopen = () => {
+    setStatus('connected');
+    log('Connected ✓');
+    // Send subscription frame
+    const ids = filter ? filter.split(',').map(s => s.trim()).filter(Boolean) : ['*'];
+    ws.send(JSON.stringify({ subscribe: ids }));
+  };
+
+  ws.onmessage = e => {
+    try {
+      const frame = JSON.parse(e.data);
+      handleFrame(frame);
+    } catch {/* ignore bad frames */}
+  };
+
+  ws.onclose = () => {
+    setStatus('disconnected');
+    log('Disconnected');
+  };
+
+  ws.onerror = err => {
+    setStatus('disconnected');
+    log('WebSocket error — is the server running?');
+  };
+}
+
+function disconnect() {
+  if (ws) { ws.close(); ws = null; }
+}
+
+// ── Frame handling ─────────────────────────────────────────────────────────
+
+function handleFrame(frame) {
+  const { sensor_id, sensor_type, value, unit, timestamp, location } = frame;
+
+  if (!sensors[sensor_id]) {
+    sensors[sensor_id] = createCard(sensor_id, sensor_type, unit, location);
+  }
+
+  const s = sensors[sensor_id];
+  const label = new Date(timestamp * 1000).toLocaleTimeString();
+
+  s.labels.push(label);
+  s.data.push(value);
+
+  if (s.labels.length > MAX_POINTS) {
+    s.labels.shift();
+    s.data.shift();
+  }
+
+  // Update value display
+  document.getElementById(`val-${sensor_id}`).textContent = value.toFixed(2);
+  document.getElementById(`ts-${sensor_id}`).textContent =
+    `Last: ${new Date(timestamp * 1000).toLocaleString()}`;
+
+  s.chart.update('none'); // no animation on data update for performance
+  document.getElementById('no-data').style.display = 'none';
+
+  log(`[${sensor_id}] ${value.toFixed(2)} ${unit}`);
+}
+
+// ── Card factory ───────────────────────────────────────────────────────────
+
+function createCard(sensor_id, sensor_type, unit, location) {
+  const color = COLORS[sensor_type] || '#8b949e';
+  const badgeClass = `badge-${sensor_type}` in document.styleSheets ? `badge-${sensor_type}` : 'badge-unknown';
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.id = `card-${sensor_id}`;
+  card.innerHTML = `
+    <div class="card-header">
+      <div>
+        <div class="sensor-id">${sensor_id}</div>
+        <div class="sensor-loc">${location}</div>
+      </div>
+      <span class="type-badge badge-${sensor_type}">${sensor_type.replace('_', ' ')}</span>
+    </div>
+    <div>
+      <span class="sensor-val" id="val-${sensor_id}">—</span>
+      <span class="sensor-unit">${unit}</span>
+    </div>
+    <canvas id="chart-${sensor_id}" height="80"></canvas>
+    <div class="ts" id="ts-${sensor_id}">Waiting…</div>
+  `;
+
+  document.getElementById('grid').appendChild(card);
+
+  const labels = [];
+  const data   = [];
+
+  const chart = new Chart(
+    document.getElementById(`chart-${sensor_id}`),
+    {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data,
+          borderColor: color,
+          backgroundColor: color + '22',
+          borderWidth: 2,
+          pointRadius: 0,
+          fill: true,
+          tension: 0.35,
+        }],
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            ticks: { color: '#8b949e', maxTicksLimit: 6, font: { size: 10 } },
+            grid:  { color: '#30363d' },
+          },
+          y: {
+            ticks: { color: '#8b949e', font: { size: 10 } },
+            grid:  { color: '#30363d' },
+          },
+        },
+      },
+    }
+  );
+
+  return { labels, data, chart };
+}
+
+// ── Status / log helpers ───────────────────────────────────────────────────
+
+function setStatus(state) {
+  const dot   = document.getElementById('status-dot');
+  const label = document.getElementById('status-label');
+  dot.className = `${state}`;
+  label.textContent = state.charAt(0).toUpperCase() + state.slice(1);
+}
+
+function log(msg) {
+  const el  = document.getElementById('log');
+  const now = new Date().toLocaleTimeString();
+  const div = document.createElement('div');
+  div.className = 'entry';
+  div.innerHTML = `<span>${now}</span>  ${msg}`;
+  el.prepend(div);
+  if (el.children.length > 80) el.removeChild(el.lastChild);
+}
+
+// Auto-connect on load
+window.addEventListener('load', () => {
+  document.getElementById('no-data').style.display = 'block';
+  connect();
+});
+</script>
+</body>
+</html>

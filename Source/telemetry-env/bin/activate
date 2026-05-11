@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV=/home/noblesse/NET322/Source/telemetry-env
+VIRTUAL_ENV=/home/noblesse/NET322-1/Source/telemetry-env
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

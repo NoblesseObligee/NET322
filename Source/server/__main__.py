@@ -19,6 +19,7 @@ from server.storage    import Storage
 from server.tcp_ingest import configure as configure_tcp, start_tcp_server
 from server.rest_api   import build_app
 
+
 DEFAULT_CONFIG = os.path.join(os.path.dirname(__file__), "..", "config", "sensors.yaml")
 
 

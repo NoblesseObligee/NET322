@@ -124,4 +124,5 @@ def build_app(storage: Storage) -> web.Application:
     app.router.add_get   ("/sensors/{id}/readings", get_readings)
     app.router.add_post  ("/sensors",               register_sensor)
     app.router.add_delete("/sensors/{id}",          delete_sensor)
+    app.router.add_static("/static", path="static", name="static")
     return app
